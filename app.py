@@ -73,14 +73,18 @@ def plot_network_multi(G, top_degree, top_betweenness, top_closeness, top_eigenv
         elif n in top_eigenvector: node_colors.append("purple")
         else: node_colors.append("skyblue")
     nx.draw(G, pos, with_labels=True, node_size=3000, node_color=node_colors, edge_color="gray", alpha=0.7)
-    plt.title("PPI Network (Colored by Centrality Top 10)", fontsize=16, color="darkblue")
+    plt.title("PPI Network (Colored by Top 10 Centrality)", fontsize=16, color="darkblue")
     st.pyplot(plt)
 
 # ---------------- STREAMLIT UI ---------------- #
 st.set_page_config(page_title="PPI Network Centrality Explorer", layout="wide")
-st.title("🌟 PPI Network , Centrality Explorer & Essential Protein Identifier")
-st.markdown("<p style='font-size:16px;color:green;'>Visualize PPI network, centralities, and download full table.</p>", unsafe_allow_html=True)
+st.title("🌟 PPI Network, Centrality & Essential Protein Explorer")
+st.markdown(
+    "<p style='font-size:16px;color:green;'>Visualize the PPI network, centralities, and download the full table.</p>",
+    unsafe_allow_html=True
+)
 
+# Inputs
 disease = st.text_input("Disease name", placeholder="e.g., Breast carcinoma", key="disease_input")
 species = st.selectbox("Species", list(SPECIES_MAP.keys()), index=0, key="species_input")
 
@@ -91,7 +95,10 @@ if st.button("Build Network"):
         try:
             taxon_id = SPECIES_MAP[species]
 
-            # 1. Query Open Targets
+            # Display disease name at top
+            st.markdown(f"<h2 style='color:#1D3557; font-family:Courier New;'>Disease: {disease}</h2>", unsafe_allow_html=True)
+
+            # 1. Open Targets
             target_info = query_open_targets(disease)
             if not target_info:
                 st.warning("No targets found.")
@@ -134,10 +141,10 @@ if st.button("Build Network"):
                 st.subheader("🟣 Top Eigenvector Influencers")
                 st.write(", ".join(top_eigenvector))
 
-                # 6. Plot network with multi colors
+                # 6. Plot network
                 plot_network_multi(G, top_degree, top_betweenness, top_closeness, top_eigenvector)
 
-                # 7. Centrality Table (ALL nodes)
+                # 7. Centrality Table (all nodes)
                 table = []
                 for node in G.nodes():
                     table.append({
@@ -153,9 +160,10 @@ if st.button("Build Network"):
 
                 # 8. Download CSV
                 csv = df.to_csv(index=False).encode('utf-8')
-                st.download_button("⬇️ Download Full Table as CSV", data=csv, file_name=f"{disease}_ppi_centrality.csv", mime="text/csv")
+                st.download_button("⬇️ Download Full Table as CSV", data=csv,
+                                   file_name=f"{disease}_ppi_centrality.csv", mime="text/csv")
 
-                # 9. Distribution plots
+                # 9. Centrality Distributions
                 st.subheader("📈 Centrality Distributions")
                 fig, axes = plt.subplots(2,2, figsize=(12,8))
                 sns.histplot(list(deg_c.values()), kde=True, ax=axes[0,0], color='skyblue'); axes[0,0].set_title("Degree Centrality")
