@@ -62,21 +62,25 @@ def fetch_ppi(string_ids, taxon_id):
     resp = requests.post(f"{STRING_API_BASE}/network", data=params)
     return resp.json()
 
-def plot_network(G, top_nodes_set):
+def plot_network_multi(G, top_degree, top_betweenness, top_closeness, top_eigenvector):
     plt.figure(figsize=(12,10))
     pos = nx.spring_layout(G, seed=42)
-    node_sizes = [3000 for _ in G.nodes()]
-    node_colors = ["red" if n in top_nodes_set else "skyblue" for n in G.nodes()]
-    nx.draw(G, pos, with_labels=True, node_size=node_sizes, node_color=node_colors, edge_color="gray", alpha=0.7)
-    plt.title("PPI Network", fontsize=16, color="darkblue")
+    node_colors = []
+    for n in G.nodes():
+        if n in top_degree: node_colors.append("red")
+        elif n in top_betweenness: node_colors.append("orange")
+        elif n in top_closeness: node_colors.append("green")
+        elif n in top_eigenvector: node_colors.append("purple")
+        else: node_colors.append("skyblue")
+    nx.draw(G, pos, with_labels=True, node_size=3000, node_color=node_colors, edge_color="gray", alpha=0.7)
+    plt.title("PPI Network (Colored by Centrality Top 10)", fontsize=16, color="darkblue")
     st.pyplot(plt)
 
 # ---------------- STREAMLIT UI ---------------- #
 st.set_page_config(page_title="PPI Network Centrality Explorer", layout="wide")
-st.title("🌟 PPI Network & Centrality Explorer")
+st.title("🌟 PPI Network , Centrality Explorer & Essential Protein Identifier")
 st.markdown("<p style='font-size:16px;color:green;'>Visualize PPI network, centralities, and download full table.</p>", unsafe_allow_html=True)
 
-# Use keys to keep values when rerunning
 disease = st.text_input("Disease name", placeholder="e.g., Breast carcinoma", key="disease_input")
 species = st.selectbox("Species", list(SPECIES_MAP.keys()), index=0, key="species_input")
 
@@ -115,23 +119,23 @@ if st.button("Build Network"):
                 eig_c = nx.eigenvector_centrality(G, max_iter=500)
 
                 # 5. Top 10 per centrality
-                top_degree = sorted(deg_c.items(), key=lambda x: x[1], reverse=True)[:TOP_N]
-                top_betweenness = sorted(bet_c.items(), key=lambda x: x[1], reverse=True)[:TOP_N]
-                top_closeness = sorted(clo_c.items(), key=lambda x: x[1], reverse=True)[:TOP_N]
-                top_eigenvector = sorted(eig_c.items(), key=lambda x: x[1], reverse=True)[:TOP_N]
+                top_degree = [p for p,_ in sorted(deg_c.items(), key=lambda x: x[1], reverse=True)[:TOP_N]]
+                top_betweenness = [p for p,_ in sorted(bet_c.items(), key=lambda x: x[1], reverse=True)[:TOP_N]]
+                top_closeness = [p for p,_ in sorted(clo_c.items(), key=lambda x: x[1], reverse=True)[:TOP_N]]
+                top_eigenvector = [p for p,_ in sorted(eig_c.items(), key=lambda x: x[1], reverse=True)[:TOP_N]]
 
-                st.subheader(f"🔴 Top {TOP_N} Hubs (Degree Centrality)")
-                st.write(", ".join([f"{p} ({deg_c[p]:.3f})" for p,_ in top_degree]))
-                st.subheader(f"🟠 Top {TOP_N} Spreaders (Betweenness Centrality)")
-                st.write(", ".join([f"{p} ({bet_c[p]:.3f})" for p,_ in top_betweenness]))
-                st.subheader(f"🟢 Top {TOP_N} Close Connectors (Closeness Centrality)")
-                st.write(", ".join([f"{p} ({clo_c[p]:.3f})" for p,_ in top_closeness]))
-                st.subheader(f"🟣 Top {TOP_N} Influencers (Eigenvector Centrality)")
-                st.write(", ".join([f"{p} ({eig_c[p]:.3f})" for p,_ in top_eigenvector]))
+                # Display top nodes
+                st.subheader("🔴 Top Degree Hubs")
+                st.write(", ".join(top_degree))
+                st.subheader("🟠 Top Betweenness Spreaders")
+                st.write(", ".join(top_betweenness))
+                st.subheader("🟢 Top Closeness Connectors")
+                st.write(", ".join(top_closeness))
+                st.subheader("🟣 Top Eigenvector Influencers")
+                st.write(", ".join(top_eigenvector))
 
-                # 6. Plot network highlighting top degree hubs
-                top_nodes_set = set([p for p,_ in top_degree])
-                plot_network(G, top_nodes_set)
+                # 6. Plot network with multi colors
+                plot_network_multi(G, top_degree, top_betweenness, top_closeness, top_eigenvector)
 
                 # 7. Centrality Table (ALL nodes)
                 table = []
@@ -149,7 +153,7 @@ if st.button("Build Network"):
 
                 # 8. Download CSV
                 csv = df.to_csv(index=False).encode('utf-8')
-                st.download_button(label="⬇️ Download Full Table as CSV", data=csv, file_name=f"{disease}_ppi_centrality.csv", mime="text/csv")
+                st.download_button("⬇️ Download Full Table as CSV", data=csv, file_name=f"{disease}_ppi_centrality.csv", mime="text/csv")
 
                 # 9. Distribution plots
                 st.subheader("📈 Centrality Distributions")
