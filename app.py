@@ -76,15 +76,39 @@ def plot_network_multi(G, top_degree, top_betweenness, top_closeness, top_eigenv
     plt.title("PPI Network (Colored by Top 10 Centrality)", fontsize=16, color="darkblue")
     st.pyplot(plt)
 
+# ---------------- FETCH STRING DESCRIPTIONS ---------------- #
+def fetch_string_descriptions(proteins, taxon_id):
+    """
+    Fetch protein description from STRING database using gene names.
+    """
+    descriptions = {}
+    for p in proteins:
+        params = {
+            "identifiers": p,
+            "species": taxon_id,
+            "caller_identity": "my_app"
+        }
+        try:
+            resp = requests.post(f"{STRING_API_BASE}/get_string_ids", data=params)
+            data = resp.json()
+            if data and "annotation" in data[0]:
+                descriptions[p] = data[0]["annotation"]
+            elif data and "preferredName" in data[0]:
+                descriptions[p] = data[0]["preferredName"]
+            else:
+                descriptions[p] = "Description not found"
+        except:
+            descriptions[p] = "Description not found"
+    return descriptions
+
 # ---------------- STREAMLIT UI ---------------- #
-st.set_page_config(page_title="PPI Network Centrality Explorer", layout="wide")
+st.set_page_config(page_title="PPI Network Centrality Explorer")
 st.title("🌟 PPI Network, Centrality & Essential Protein Explorer")
 st.markdown(
     "<p style='font-size:16px;color:green;'>Visualize the PPI network, centralities, and download the full table.</p>",
     unsafe_allow_html=True
 )
 
-# Inputs
 disease = st.text_input("Disease name", placeholder="e.g., Breast carcinoma", key="disease_input")
 species = st.selectbox("Species", list(SPECIES_MAP.keys()), index=0, key="species_input")
 
@@ -95,7 +119,6 @@ if st.button("Build Network"):
         try:
             taxon_id = SPECIES_MAP[species]
 
-            # Display disease name at top
             st.markdown(f"<h2 style='color:#1D3557; font-family:Courier New;'>Disease: {disease}</h2>", unsafe_allow_html=True)
 
             # 1. Open Targets
@@ -131,7 +154,6 @@ if st.button("Build Network"):
                 top_closeness = [p for p,_ in sorted(clo_c.items(), key=lambda x: x[1], reverse=True)[:TOP_N]]
                 top_eigenvector = [p for p,_ in sorted(eig_c.items(), key=lambda x: x[1], reverse=True)[:TOP_N]]
 
-                # Display top nodes
                 st.subheader("🔴 Top Degree Hubs")
                 st.write(", ".join(top_degree))
                 st.subheader("🟠 Top Betweenness Spreaders")
@@ -157,6 +179,38 @@ if st.button("Build Network"):
                 df = pd.DataFrame(table)
                 st.subheader("📊 Protein Centrality Table (All Nodes)")
                 st.dataframe(df, height=400)
+
+                # ---------------- ADDITION: ESSENTIALITY SCORE ---------------- #
+                df_score = df.copy()
+                for col in ["Degree", "Betweenness", "Closeness", "Eigenvector"]:
+                    min_val = df_score[col].min()
+                    max_val = df_score[col].max()
+                    if max_val - min_val > 0:
+                        df_score[col + "_norm"] = (df_score[col] - min_val) / (max_val - min_val)
+                    else:
+                        df_score[col + "_norm"] = 0
+
+                df_score["EssentialityScore"] = df_score[["Degree_norm", "Betweenness_norm", "Closeness_norm", "Eigenvector_norm"]].sum(axis=1)
+
+                top_essential = df_score.sort_values("EssentialityScore", ascending=False).head(TOP_N)
+                st.subheader("⭐ Top 10 Essential Proteins")
+                st.write(top_essential[["Protein", "EssentialityScore"]])
+
+                # ---------------- FETCH DESCRIPTIONS FROM STRING ---------------- #
+                top_essential_desc = fetch_string_descriptions(top_essential["Protein"].tolist(), taxon_id)
+                top_essential["Description"] = top_essential["Protein"].map(top_essential_desc)
+
+                st.subheader("📄 Top Essential Proteins with STRING Descriptions")
+                st.dataframe(top_essential[["Protein", "EssentialityScore", "Description"]], height=400)
+
+                # ---------------- BAR PLOT OF ESSENTIALITY SCORE ---------------- #
+                st.subheader("📊 Essentiality Score Bar Plot")
+                fig, ax = plt.subplots(figsize=(10,5))
+                sns.barplot(x="Protein", y="EssentialityScore", data=top_essential, palette="viridis", ax=ax)
+                plt.xticks(rotation=45)
+                plt.ylabel("Essentiality Score (sum of normalized centralities)")
+                plt.title("Top 10 Essential Proteins")
+                st.pyplot(fig)
 
                 # 8. Download CSV
                 csv = df.to_csv(index=False).encode('utf-8')
