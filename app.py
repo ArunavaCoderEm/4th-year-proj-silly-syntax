@@ -574,19 +574,19 @@ if build_button:
         col1, col2 = st.columns(2)
         
         with col1:
-            st.markdown("<h4 style='color: #3b82f6;'>⬤ Top Degree Centrality (Hubs)</h4>", unsafe_allow_html=True)
+            st.markdown("<h4 style='color: #3b82f6;'>🔴 Top Degree Centrality (Hubs)</h4>", unsafe_allow_html=True)
             st.markdown(f"<div class='protein-list'>{', '.join(top_degree)}</div>", unsafe_allow_html=True)
             
             st.markdown("<br>", unsafe_allow_html=True)
-            st.markdown("<h4 style='color: #10b981;'>⬤ Top Closeness Centrality (Connectors)</h4>", unsafe_allow_html=True)
+            st.markdown("<h4 style='color: #10b981;'>🟠 Top Closeness Centrality (Connectors)</h4>", unsafe_allow_html=True)
             st.markdown(f"<div class='protein-list'>{', '.join(top_closeness)}</div>", unsafe_allow_html=True)
         
         with col2:
-            st.markdown("<h4 style='color: #f59e0b;'>⬤ Top Betweenness Centrality (Spreaders)</h4>", unsafe_allow_html=True)
+            st.markdown("<h4 style='color: #f59e0b;'>🟢 Top Betweenness Centrality (Spreaders)</h4>", unsafe_allow_html=True)
             st.markdown(f"<div class='protein-list'>{', '.join(top_betweenness)}</div>", unsafe_allow_html=True)
             
             st.markdown("<br>", unsafe_allow_html=True)
-            st.markdown("<h4 style='color: #8b5cf6;'>⬤ Top Eigenvector Centrality (Influencers)</h4>", unsafe_allow_html=True)
+            st.markdown("<h4 style='color: #8b5cf6;'>🟣 Top Eigenvector Centrality (Influencers)</h4>", unsafe_allow_html=True)
             st.markdown(f"<div class='protein-list'>{', '.join(top_eigenvector)}</div>", unsafe_allow_html=True)
         
         # Network Visualization
@@ -644,13 +644,13 @@ if build_button:
         st.markdown("""
         <div class='section-header'>
             <div class='icon-box icon-orange'>⚡</div>
-            <h2 class='section-title'>Top 10 Seed Proteins</h2>
+            <h2 class='section-title'>Top 10 Essential Proteins</h2>
         </div>
         """, unsafe_allow_html=True)
         
         st.markdown("""
         <div class='description-box'>
-            Seed proteins are identified using a weighted combination of centrality measures: 
+            Essential proteins are identified using a weighted combination of centrality measures: 
             Degree (30%) + Betweenness (25%) + Closeness (20%) + Eigenvector (15%) + PageRank (10%)
         </div>
         """, unsafe_allow_html=True)
