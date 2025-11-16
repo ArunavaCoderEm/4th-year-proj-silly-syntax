@@ -223,7 +223,7 @@ if st.button("Build Network"):
         for col in ["Degree", "Betweenness", "Closeness", "Eigenvector", "PageRank"]:
             df_norm[col+"_norm"] = (df_norm[col] - df_norm[col].min())/(df_norm[col].max()-df_norm[col].min())
 
-        # Essentiality formula EXACTLY as you asked
+       
         df_norm["Essentiality"] = (
             0.30 * df_norm["Degree_norm"] +
             0.25 * df_norm["Betweenness_norm"] +
