@@ -644,13 +644,13 @@ if build_button:
         st.markdown("""
         <div class='section-header'>
             <div class='icon-box icon-orange'>⚡</div>
-            <h2 class='section-title'>Top 10 Essential Proteins (Weighted Centrality)</h2>
+            <h2 class='section-title'>Top 10 Seed Proteins</h2>
         </div>
         """, unsafe_allow_html=True)
         
         st.markdown("""
         <div class='description-box'>
-            Essential proteins are identified using a weighted combination of centrality measures: 
+            Seed proteins are identified using a weighted combination of centrality measures: 
             Degree (30%) + Betweenness (25%) + Closeness (20%) + Eigenvector (15%) + PageRank (10%)
         </div>
         """, unsafe_allow_html=True)
