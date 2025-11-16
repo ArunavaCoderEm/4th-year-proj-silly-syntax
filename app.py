@@ -629,8 +629,7 @@ if build_button:
         df_norm = df.copy()
         for col in ["Degree", "Betweenness", "Closeness", "Eigenvector", "PageRank"]:
             df_norm[col+"_norm"] = (df_norm[col] - df_norm[col].min())/(df_norm[col].max()-df_norm[col].min())
-
-       
+        
         df_norm["Essentiality"] = (
             0.30 * df_norm["Degree_norm"] +
             0.25 * df_norm["Betweenness_norm"] +
