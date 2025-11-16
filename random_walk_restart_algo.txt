@@ -1,0 +1,312 @@
+What the algorithm is about (one-liner):
+It takes a protein interaction network, highlights a small set of “seed” proteins, then spreads that seed importance through the network by simulating a random walker that sometimes returns to the seeds. Proteins the walker visits most are predicted essential.
+
+Everyday analogy:
+
+Proteins = shops in a small town.
+
+Roads = paths between shops.
+
+You mark a few well-known shops (seeds).
+
+You release delivery drivers who wander the town but occasionally return to the known shops.
+
+Shops visited most often are probably important hubs — essential.
+
+Tiny intuitive example (no numbers yet):
+If seed = “Bakery” and the bakery is connected to Café and Market, which in turn connect to many shops, the random-walk will visit Market and Café often — they get high scores because they are close to and connected with the bakery.
+
+2) How we applied this algorithm on your PPIN (plain steps, what each step does)
+
+Below I map the abstract steps to what we actually ran on your data.
+
+Load node & edge tables
+
+Node table: list of proteins (IDs) + any precomputed centrality columns.
+
+Edge table: rows like "9606.ENSP00000159060 (pp) 9606.ENSP00000342848" plus a stringdb::score weight.
+
+Parse the edge column
+
+We extract the two protein IDs from strings like A (pp) B → A, B.
+
+Build a graph G(V,E)
+
+Nodes = protein IDs from node table (we keep isolated nodes too).
+
+Edge (A,B) added with weight (stringdb::score) if present.
+
+(If needed) compute centralities in Python
+
+If your node table doesn’t contain real centrality numbers, we compute them with NetworkX:
+
+Degree, Betweenness, Closeness, Eigenvector (these are basic network measures).
+
+Normalize centralities and compute a composite seed score
+
+Each centrality is min–max normalized to 0–1.
+
+Composite score = average of selected normalized centralities.
+
+Pick top-k proteins by composite score as seeds.
+
+Build transition probability matrix P
+
+For each node j, the column j of P gives probabilities to move from node j to each neighbor i.
+
+If node j has neighbors with weights w1,w2,..., then probability to neighbor i = wi / (sum of w's for j).
+
+Set the seed vector p0
+
+If seeds list is S: p0[i] = 1 if i in seeds, else 0; then normalize so sum(p0)=1.
+
+(Alternatively, you can use composite scores as p0 weights; either is OK.)
+
+Run RWR iterations (until stable)
+
+Use the formula:
+
+p_next = (1 - r) * P @ p + r * p0
+
+
+where r = restart probability (how often we return to seeds).
+
+Repeat until ||p_next - p|| is very small (converged).
+
+Sort nodes by final p (RWR score)
+
+Higher p → more likely essential.
+
+Output top N proteins and save full score file
+
+3) The last steps explained in very small, concrete steps with numbers (4-node numeric example)
+
+We’ll use a tiny network of 4 proteins A, B, C, D (easy names so you can map to your IDs).
+
+Network (edges are unweighted = 1 for simplicity)
+
+Edges:
+A — B
+A — C
+B — C
+C — D
+
+So connections:
+
+A neighbors: B, C
+
+B neighbors: A, C
+
+C neighbors: A, B, D
+
+D neighbors: C
+
+Order nodes as [A, B, C, D]
+
+STEP 7: Build the transition matrix P (column-stochastic)
+
+We build P so column j sums to 1 and P[i, j] = prob of going from node j to node i.
+
+Compute degrees (number of neighbors):
+
+deg(A) = 2 → neighbors B, C
+
+deg(B) = 2 → neighbors A, C
+
+deg(C) = 3 → neighbors A, B, D
+
+deg(D) = 1 → neighbor C
+
+Columns of P (each column = probabilities from that node):
+
+Column for A (walker at A → goes to B or C equally = 1/2 each):
+
+col_A = [0, 1/2, 1/2, 0]ᵀ
+
+
+Column for B:
+
+col_B = [1/2, 0, 1/2, 0]ᵀ
+
+
+Column for C:
+
+col_C = [1/3, 1/3, 0, 1/3]ᵀ
+
+
+Column for D:
+
+col_D = [0, 0, 1, 0]ᵀ
+
+
+So matrix P (rows A,B,C,D; columns A,B,C,D):
+
+P = [ 0      0.5    1/3    0
+      0.5    0      1/3    0
+      0.5    0.5    0      1
+      0      0      1/3    0 ]
+
+
+(You can check each column sums to 1: column A=0+0.5+0.5+0=1, etc.)
+
+STEP 8: Set seed vector p0 and parameters
+
+Let’s pick one seed: A only. So before normalization, p0_raw = [1, 0, 0, 0]. Normalized p0 is the same because sum=1.
+
+Choose restart probability r = 0.5 (walk half the time, restart half the time). This is easy to follow.
+
+Initialize p = p0 = [1, 0, 0, 0].
+
+ITERATION 1: compute p1
+
+Formula:
+
+p1 = (1 - r) * P @ p + r * p0
+   = 0.5 * (P @ p) + 0.5 * p0
+
+
+Compute P @ p (matrix times vector p): because p is [1,0,0,0], P @ p = first column of P = [0, 0.5, 0.5, 0].
+
+Now:
+
+0.5 * (P @ p) = [0, 0.25, 0.25, 0]
+0.5 * p0 = [0.5, 0, 0, 0]
+p1 = sum = [0.5, 0.25, 0.25, 0]
+
+
+Interpretation: after first step, 50% weight stays at A (because of restart), 25% at B, 25% at C.
+
+ITERATION 2: compute p2
+
+p2 = 0.5 * (P @ p1) + 0.5 * p0
+
+To get P @ p1 we combine columns of P weighted by p1 entries:
+
+P @ p1 = 0.5*col_A + 0.25*col_B + 0.25*col_C
+
+
+Compute each:
+
+0.5 * col_A = [0, 0.25, 0.25, 0]
+
+0.25 * col_B = [0.125, 0, 0.125, 0]
+
+0.25 * col_C = [0.083333..., 0.083333..., 0, 0.083333...]
+
+Add them:
+
+P @ p1 ≈ [0.2083333, 0.3333333, 0.375, 0.0833333]
+
+
+Then
+
+p2 = 0.5 * (P @ p1) + 0.5 * p0
+   = 0.5 * [0.2083333, 0.3333333, 0.375, 0.0833333] + [0.5,0,0,0]
+   = [0.1041667, 0.1666667, 0.1875, 0.0416667] + [0.5, 0, 0, 0]
+   = [0.6041667, 0.1666667, 0.1875, 0.0416667]
+
+
+Interpretation: A still gets the most (0.604), but B and C also have notable probabilities.
+
+ITERATION 3: compute p3 (show convergence trends)
+
+Compute P @ p2:
+
+P @ p2 = 0.6041667*col_A + 0.1666667*col_B + 0.1875*col_C + 0.0416667*col_D
+
+Calculate contributions (I'll show sums):
+
+Contribution from col_A * 0.6041667 → [0, 0.30208335, 0.30208335, 0]
+
+from col_B * 0.1666667 → [0.08333335, 0, 0.08333335, 0]
+
+from col_C * 0.1875 → [0.0625, 0.0625, 0, 0.0625]
+
+from col_D * 0.0416667 → [0, 0, 0.0416667, 0]
+
+Sum ≈ [0.1458333, 0.3645833, 0.4270833, 0.0625]
+
+Then:
+
+p3 = 0.5 * that + 0.5 * p0
+   = [0.0729167, 0.1822917, 0.2135417, 0.03125] + [0.5,0,0,0]
+   = [0.5729167, 0.1822917, 0.2135417, 0.03125]
+
+
+Compare p2 vs p3: changes are getting smaller — we are converging.
+
+ITERATION 4: compute p4 (one more to see stabilization)
+
+Compute P @ p3 similarly (I’ll show result):
+
+P @ p3 ≈ [0.1623264, 0.3576389, 0.4088542, 0.0711806]
+
+Then:
+
+p4 = 0.5 * that + 0.5 * p0
+   = [0.0811632, 0.1788195, 0.2044271, 0.0355903] + [0.5,0,0,0]
+   = [0.5811632, 0.1788195, 0.2044271, 0.0355903]
+
+
+Differences vs p3 are small — the vector is converging to something like:
+final ~ [0.58, 0.18, 0.20, 0.04]
+
+STEP 9: Final RWR scores & ranking
+
+After convergence, the steady-state p* (approx) is:
+
+A : 0.58  (highest)
+C : 0.20
+B : 0.18
+D : 0.04  (lowest)
+
+
+Interpretation:
+
+A is highest because we restarted to A often — it keeps pulling probability back.
+
+C is important because it connects to many nodes (including D).
+
+B has intermediate importance.
+
+D is least important (only one neighbor).
+
+If you take top 2 proteins as predicted essential: [A, C].
+
+Quick mapping to your real PPIN run
+
+In your real run we:
+
+parsed edges,
+
+built G (you had 89 nodes and 678 edges),
+
+computed centralities or used node table values,
+
+selected top-K seeds (automatically),
+
+built P (from edge weights),
+
+ran RWR (same math as in example),
+
+ranked proteins by final p.
+
+If seed scores were all zero earlier, it meant the node centralities were missing — we fixed that by computing centralities in Python. With correct seeds and graph, the RWR scores will be meaningful (they won't all be equal).
+
+Final tips & checks (short)
+
+Check graph edges: if graph edges = 0 → parser failed. You fixed this earlier.
+
+Check seed vector: if composite seed scores are all 0 → compute centralities in Python or run NetworkAnalyzer in Cytoscape.
+
+Restart probability r:
+
+Large r (e.g., 0.75) → scores stay near seeds (local neighborhood).
+
+Small r (e.g., 0.2) → diffusion spreads far (global).
+
+Try 0.5 as a balanced default.
+
+Convergence: check ||p_new - p|| (L1 norm); stop when < 1e-8 (or 1e-6 for speed).
+
+Interpretation: cross-check top proteins with literature or essential gene lists for validation.
